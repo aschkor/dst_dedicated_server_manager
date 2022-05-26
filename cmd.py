@@ -56,7 +56,7 @@ def rm_module()-> None:
     res = int_menu(get_module_list_name(modules))
     if res == 0:
         return
-    mods.remove(modules[res - 1])
+    mods.remove(modules[res - 1].identity)
 
 
 def add_module() -> None:
