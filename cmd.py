@@ -4,36 +4,36 @@ import module.ssh as ssh
 import module.configuration_file as configuration_file
 import module.worldgen as worldgen
 import module.mods as mods
+import module.cluster as cluster
+import module.token as token
 import sys
 
-def main_menu(ssh: ssh.SshSession) -> bool:
+def main_menu() -> bool:
     options = ["Start exisiting cluster","Create new shard cluster","Remove cluster", "Add token","Manage modules"]
-    if ssh.has_started_cluster():
+    if cluster.is_started():
         options[0] = "Stop current cluster"
-
-    menu = create_menu(options)
-    choice = int_input(dict_to_str(menu), len(options))
+    choice = int_menu(options)
     if choice == 0:
         return False
     if choice == 1 :
-        if not ssh.has_started_cluster():
-            start_cluster(ssh)
+        if not cluster.is_started():
+            start_cluster()
             return False
         else:
             print("Please wait for the cluster to stop")
-            ssh.stop_servers()
+            cluster.stop()
     elif choice == 2:
-        create_cluster(ssh)
+        create_cluster()
     elif choice == 3:
-        remove_cluster(ssh)
+        remove_cluster()
     elif choice == 4:
-        add_token(ssh)
+        add_token()
     elif choice == 5:
-        manage_module(ssh)
+        manage_module()
     return True
     
 
-def manage_module(ssh_session: ssh.SshSession) -> None:
+def manage_module() -> None:
 
     menu = create_menu(["Installed module", "Install module", "Uninstall module"])
     while True :
@@ -41,34 +41,30 @@ def manage_module(ssh_session: ssh.SshSession) -> None:
         if res == 0:
             return
         if res == 1:
-            view_module(ssh_session)
+            view_module()
         if res == 2:
-            add_module(ssh_session)
+            add_module()
         if res == 3:
-            rm_module(ssh_session)
+            rm_module()
 
-def rm_module(ssh_session: ssh.SshSession)-> None:
-    manager = mods.ModulesManager(ssh_session)
-    modules = manager.all_available_modules()
-    names = get_module_list_name(modules)
-    menu = create_menu(names)
-    res = int_input(dict_to_str(menu), len(menu))
+def int_menu(choices: list[str]) -> int:
+    menu = create_menu(choices)
+    return int_input(dict_to_str(menu), len(choices))
+
+def rm_module()-> None:
+    modules = mods.installed()
+    res = int_menu(get_module_list_name(modules))
     if res == 0:
         return
-    manager.remove_available_module(modules[res - 1])
+    mods.remove(modules[res - 1])
 
 
-def add_module(ssh_session: ssh.SshSession) -> None:
-    manager = mods.ModulesManager(ssh_session)
-    user = input_value('Enter your steam username')
-    password = input_value('Enter your steam password')
+def add_module() -> None:
     while True:
         res = input_value('Enter module Id (Enter 0 to return)')
         if res == '0':
-            manager.write_available_module(mods.Credential(user,password))
             return
-        #guard_code = input_value('Enter your steam guard code')
-        manager.add_available_module(res)
+        mods.add(res)
     
 def get_module_list_name(modules: list[mods.Module]) -> list[str]:
     res = []
@@ -92,30 +88,28 @@ def get_module_list_name(modules: list[mods.Module]) -> list[str]:
         res.append(line)
     return res
 
-def view_module(ssh_session: ssh.SshSession) -> None:
-    manager = mods.ModulesManager(ssh_session)
-    res = get_module_list_name(manager.all_available_modules())
+def view_module() -> None:
+    res = get_module_list_name(mods.installed())
     line = ''
     for l in res:
         line = line + l + '\n\n'
     print(line)
     
 
-def get_clusters(ssh_session: ssh.SshSession) -> list[ssh.Cluster]:
+def get_clusters() -> list[cluster.Cluster]:
     print('Retrieve available cluster, please wait...')
-    return ssh_session.servers()
+    return cluster.clusters()
     
 
-def remove_cluster(ssh_session: ssh.SshSession) -> None:
+def remove_cluster() -> None:
     names = []
-    for cluster in get_clusters(ssh_session):
-        if cluster.cluster.name():
-            names.append(cluster.cluster.name())
-    menu = create_menu(names)
-    choice = int_input(dict_to_str(menu), len(names))
+    for cl in get_clusters():
+        if cl.settings.name():
+            names.append(cl.settings.name())
+    choice = int_menu(names)
     if choice == 0:
         return
-    ssh_session.rm_cluster(names[choice -1])
+    cluster.remove(names[choice -1])
 
 
 def select_module(names) -> list[int]:
@@ -129,7 +123,6 @@ def select_module(names) -> list[int]:
             select.remove(choice)
         else:
             select.append(choice)
-    return select
 
 def configure_value(option):
     names = []
@@ -178,39 +171,37 @@ def configure_module(modules) -> None:
 
 
 
-def add_mods(ssh_session: ssh.SshSession) -> Union[mods.ModulesManager, None]:
+def add_mods() -> list[mods.Module]:
     menu = create_menu(['Add module'])
     res = int_input(dict_to_str(menu), 1)
 
     if res == 0:
-        return None
+        return []
 
-    manager = mods.ModulesManager(ssh_session)
-    modules = manager.all_available_modules()
+    modules = mods.installed()
     names = get_module_list_name(modules)
     selected_module = []
     for s in select_module(names):
         selected_module.append(modules[s - 1])
-    configure_module(selected_module)
-    for m in selected_module:
-        manager.add_server_module(m)
-    return manager
+    if len(selected_module):
+        configure_module(selected_module)
+    return selected_module
 
 
-def create_cluster(ssh_session: ssh.SshSession) -> None:
-    name = in_name(ssh_session)
-    if name == None:
+def create_cluster() -> None:
+    name = in_name()
+    if name is None:
         return
     description = in_description()
-    if description == None:
+    if description is None:
         return
     password = in_password()
-    if password == None:
+    if password is None:
         return
-    token = token_menu(ssh_session)
-    if token == None:
+    token = token_menu()
+    if token is None:
         return
-    manager = add_mods(ssh_session)
+    modules = add_mods()
 
     cl = configuration_file.Cluster()
     cl.set_name(name)
@@ -230,19 +221,19 @@ def create_cluster(ssh_session: ssh.SshSession) -> None:
     cave.set_master_port(27017)
     cave.set_port(11000)
     cave.set_master_enabled(False)
-    ssh_session.add_server(ssh.Cluster(cl, ssh.Server(master, worldgen.Overworld()), ssh.Server(cave, gen), token, manager))
+    cluster.add(cluster.Cluster(cl, token ,cluster.Server(master, worldgen.Overworld(), modules), cluster.Server(cave, gen, modules)))
 
 
-def is_token_already_exits(name: str, ssh: ssh.SshSession) -> bool:
-    tokens = ssh.get_available_tokens()
-    for token in tokens:
-        if token.owner == name:
+def is_token_already_exits(name: str) -> bool:
+    tks = token.tokens()
+    for tk in tks:
+        if tk.owner == name:
             return True
     return False
 
     
 
-def add_token(ssh_session: ssh.SshSession) ->  Union[ssh.ClusterToken, None]:
+def add_token() ->   None:
     path = input_value('Enter token path (enter 0 to return)')
     if path == '0':
         return 
@@ -253,94 +244,65 @@ def add_token(ssh_session: ssh.SshSession) ->  Union[ssh.ClusterToken, None]:
     name = input_value('Enter the name of the token owner (enter 0 to return)')
     if name == '0':
         return 
-    if is_token_already_exits(name, ssh_session):
+    if is_token_already_exits(name):
         print("The token {} already exist".format(name))
         name = ''
         
-    token = ssh.ClusterToken(name, content)
-    ssh_session.add_token(token)
-    return token
+    tk = token.Token(name, content)
+    tk.add_to_available_token()
 
 
-def token_menu(ssh_session: ssh.SshSession) -> Union[ssh.ClusterToken, None]:
-    print('Available token')
-    menu = create_menu(['Add new token', 'Use exisiting token'])
-    choice = int_input(dict_to_str(menu), len(menu))
-    token = None
-
-    if choice == 0:
-        return None
-    if choice == 1:
-        token = add_token(ssh_session)
-    elif choice == 2:
-        token = available_token(ssh_session)
-    else:
-        return token_menu(ssh_session)
-    if token == None:
-        return token_menu(ssh_session)
-
-    return token
+def token_menu() -> Union[token.Token, None]:
+    while True:
+        print('Available token')
+        choice = int_menu(['Add new token', 'Use exisiting token'])
+        if choice == 0:
+            return None
+        if choice == 1:
+            token = add_token()
+        elif choice == 2:
+            return select_token()
 
     
-def available_token(ssh_session: ssh.SshSession) -> Union[ssh.ClusterToken, None]:
-    tokens = ssh_session.get_available_tokens()
+def select_token() -> Union[token.Token, None]:
+    tks = token.tokens()
     tokens_name = []
-    for token in tokens:
-        tokens_name.append(token.owner)
+    for tk in tks:
+        tokens_name.append(tk.owner)
     menu = create_menu(tokens_name)
     res = int_input(dict_to_str(menu), len(menu))
     if res == 0:
         return None
-    return tokens[ res -1]
+    return tks[ res -1]
 
-def start_cluster(ssh_session: ssh.SshSession) -> None:
-    clusters = get_clusters(ssh_session)
+def start_cluster() -> None:
+    clusters = get_clusters()
     cluster_infos = []
     cluster_names = []
 
-    for cluster in clusters :
-        if cluster.cluster.name() == None or cluster.token == None:
+    for clus in clusters :
+        if clus.settings.name() is None or clus.token is None:
             continue
-        if cluster.token.key == None:
+        if clus.token.content is None:
             continue
 
-        info = str(cluster.cluster.name())
+        info = str(clus.settings.name())
         cluster_names.append(info)
-        if cluster.cluster.password():
-            info = info + ', password {}'.format(cluster.cluster.password())
-        if cluster.cluster.description():
-            info = info + ', description: {}'.format(cluster.cluster.description())
-        if cluster.token.owner:
-            info = info + ', owner: {}'.format(cluster.token.owner)
+        if clus.settings.password():
+            info = info + ', password {}'.format(clus.settings.password())
+        if clus.settings.description():
+            info = info + ', description: {}'.format(clus.settings.description())
+        if clus.token.owner:
+            info = info + ', owner: {}'.format(clus.token.owner)
         cluster_infos.append(info)
         
     menu = create_menu(cluster_infos)
     print("Choose a cluster to start:")
     choice = int_input(dict_to_str(menu), len(clusters))
     if choice == 0:
-        main_menu(ssh_session)
+        main_menu()
         return
-    ssh_session.start_servers(cluster_names[choice-1])
-
-
-def default_shard_cluster(name, password ,token) -> ssh.Cluster:
-    cl = configuration_file.Cluster()
-    cl.set_name(name)
-    cl.set_password(password)
-    cl.set_master_ip('127.0.0.1')
-    cl.set_shard_enabled(True)
-    cl.set_cluster_key('YouAreJustASlave')
-    master = configuration_file.Server()
-    master.set_master_enabled(True)
-    gen = worldgen.Underworld()
-    gen.set_preset_generation(worldgen.Preset.CAVE)
-    gen.set_preset_settings(worldgen.Preset.CAVE)
-    cave = configuration_file.Server()
-    cave.set_authentication_port(8767)
-    cave.set_master_port(27017)
-    cave.set_port(11000)
-    cave.set_master_enabled(False)
-    return ssh.Cluster(cl, ssh.Server(master, worldgen.Overworld()), ssh.Server(cave, gen), token)
+    cluster.start(cluster_names[choice-1])
 
 
 def format_enum(enum) -> str:
@@ -405,16 +367,16 @@ def int_input(consign , choice_number: int, required: bool = True) -> int:
         print ('The value must be an integer')
         return int_input(consign, choice_number, required)
 
-def in_name(ssh_session: ssh.SshSession) -> Union[str, None]:
+def in_name() -> Union[str, None]:
     res = input_value('Enter the cluster name (enter 0 to return)')
     if res == '0':
         return None
     print('Name checking avaibility')
-    clusters = get_clusters(ssh_session)
+    clusters = get_clusters()
     for cluster in clusters:
-        if res == cluster.cluster.name():
+        if res == cluster.settings.name():
             print('This name is not available')
-            return in_name(ssh_session)
+            return in_name()
     return res
 
 def in_description() -> Union[str, None]:
@@ -439,7 +401,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     print('Welcome to the Don\'t Starve Together dedicated server manager')
     print('Please wait to the server connexion...')
-    session = ssh.SshSession(args.ip_address, args.username, args.password)
     
-    while(main_menu(session)):
+    ssh.SshSession(args.ip_address, args.username, args.password)
+    
+    while(main_menu()):
         pass

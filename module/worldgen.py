@@ -1,5 +1,8 @@
 from enum import Enum
+from typing import Union
+from . import constant
 from .slpp import slpp
+from . import ssh
 
 class EnumOption(Enum):
     def __str__(self) -> str:
@@ -355,9 +358,23 @@ class Settings(Enum):
 
 
 class WorldGen:
-    def __init__(self):
-        self.__dict = {}
+    def __init__(self, cluster_name: Union[str, None] = None, is_master:bool = True):
+        if cluster_name is None:
+            self.__dict = {}
+        else:
+            path = constant.CLUSTER_DIRECTORY / cluster_name
+            if is_master:
+                path = path / constant.MASTER_NAME_DIR
+            else:
+                path = path / constant.CAVE_NAME_DIR
+            path = path / 'worldgenoverride.lua'
+            if not ssh.is_exist(path):
+                return
+            content = ssh.get_file_content(path)
 
+            if content is None:
+                raise RuntimeError('The file {} don\'t exsite'.format(path))
+            self.__dict = slpp.slpp.decode(content)
 
     def __update_override_enabled(self):
         keys = list(self.__dict.keys())
@@ -377,14 +394,14 @@ class WorldGen:
     def add_or_update(self, key, value) -> None:
         data = key.value[0]
 
-        if value == data.option.DEFAULT or value == None:
+        if value == data.option.DEFAULT or value is None:
             self.remove(key)
             return
 
-        if data.cat == None:
+        if data.cat is None:
             self.__dict[data.name] = str(value)
         else:
-            if data.cat != None and self.__dict.get(data.cat) == None:
+            if data.cat != None and self.__dict.get(data.cat) is None:
                 self.__dict.update({data.cat : {}})
             self.__dict[data.cat][data.name] = str(value)
 
@@ -392,19 +409,17 @@ class WorldGen:
         
     def get(self, key):
         res = self.__dict.get(key.value[0].name)
-        if res == None:
+        if res is None:
             return key.value[0].options.Default
         return key.value[0].options(res)
 
     def is_empty(self) -> bool:
         return not bool(self.__dict)
 
-    def load(self, worldgen) -> None:
-        self.__dict = slpp.slpp.decode(worldgen)
         
     def remove(self, key) -> None:
         data = key.value[0]
-        if data.cat == None:
+        if data.cat is None:
             self.__dict.pop(data.name)
         else:
             self.__dict[data.cat].pop(data.name)
@@ -622,8 +637,8 @@ class WorldGen:
 
 
 class Overworld(WorldGen):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, cluster_name: Union[str, None] = None, is_master:bool = True):
+        super().__init__(cluster_name, is_master)
 
     def starting_season(self) -> Season:
         return self.get(Generation.STARTING_SEASON)
@@ -1304,8 +1319,8 @@ class Overworld(WorldGen):
         return self.add_or_update(Settings.POISON_BIRCHNUT_TREES, poison_birchnut_trees)
 
 class Underworld(WorldGen):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, cluster_name: Union[str, None] = None, is_master:bool = False):
+        super().__init__(cluster_name, is_master)
 
     def ancient_gateway(self) -> Frequency:
         return self.get(Settings.ANCIENT_GATEWAY)
@@ -1528,5 +1543,3 @@ class Underworld(WorldGen):
 
     def set_tentacles(self, tentacles: Rarities) -> None:
         self.add_or_update(Generation.TENTACLES, tentacles)
-
-

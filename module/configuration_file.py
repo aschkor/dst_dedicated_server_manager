@@ -1,8 +1,31 @@
 from enum import Enum
 from io import StringIO
-import configparser
 from typing import Union
-import ipaddress
+from .import ssh
+from . import constant
+
+try:
+    import configparser
+except:
+    print('installing dependency configparser')
+    import os
+    try:
+        os.system('python3 -m pip install configparser')
+        import configparser
+    except:
+        os.system('python -m pip install configparser')
+        import configparser
+try:
+    import ipaddress
+except:
+    print('installing dependency ipaddress')
+    import os
+    try:
+        os.system('python3 -m pip install ipaddress')
+        import ipaddress
+    except:
+        os.system('python -m pip install ipaddress')
+        import ipaddress
 
 class Options(Enum):
     def __str__(self):
@@ -118,13 +141,10 @@ def to_bool(value):
     return False
 
 
-class ConfigurationFile:
+class ConfigurationFile():
     def __init__(self):
         self.__config = configparser.ConfigParser()
         
-
-    def load(self, config_file: str) -> None:
-        self.__config.read_string(config_file)
 
     def __is_exist(self, key) -> bool:
             return self.__config.has_option(str(key.value[0].category), str(key.value[0].name))
@@ -161,7 +181,7 @@ class ConfigurationFile:
 
 
     def add_option(self,key, value) -> None:
-        if value == None:
+        if value is None:
             if self.__is_exist(key):
                 self.__rm(key)
             return
@@ -179,29 +199,36 @@ class ConfigurationFile:
             return
 
         self.__add(key,value)
-            
 
-    def __str__(self):
+    def _write(self) -> str:
         res = StringIO()
         self.__config.write(res)
         return res.getvalue()
 
+    def _read(self, content:str) -> None:
+            self.__config.read_string(content)
 
+
+            
 class Cluster(ConfigurationFile):
-    def __init__(self):
+    def __init__(self, cluster_name: Union[str, None] = None):
         super().__init__()
+        if cluster_name is not None:
+            self.load(cluster_name)
+        
+    def install(self) -> None:
+        res = self._write()
+        name = self.name()
+        if name is None:
+            raise RuntimeError('Cluster must have a name')
+        path = constant.CLUSTER_DIRECTORY / name / 'cluster.ini'
+        ssh.create_file(path, res)
 
-
-    def __rm_ifn(self, key: ClusterKey, value) -> bool:
-        if value == None:
-            self.remove_option(key)
-            return True
-        if isinstance(value, str):
-            if not len(value):
-                self.remove_option(key)
-                return True
-        return False
-
+    def load(self, cluster_name: str) -> None:
+        path = constant.CLUSTER_DIRECTORY / cluster_name / 'cluster.ini'
+        content = ssh.get_file_content(path)
+        if content != None:
+            self._read(content)
 
     def max_snapshots(self) -> int:
         return int(self.get_option(ClusterKey.MAX_SNAPSHOTS))
@@ -427,7 +454,7 @@ class Cluster(ConfigurationFile):
             return True
 
         ip = self.master_ip()
-        if ip == None:
+        if ip is None:
             return False
         return bool(len(ip))
 
@@ -436,26 +463,49 @@ class Cluster(ConfigurationFile):
         if not self.is_shard_enabled():
             return True
         key = self.cluster_key()
-        if key == None:
+        if key is None:
             return False
         return bool(len(key))
 
 
     def check_name(self) -> bool:
         name = self.name()
-        if name == None:
+        if name is None:
             return False
         return bool(len(name))
     
 
 class Server(ConfigurationFile):
-    def __init__(self):
+    def __init__(self, cluster_name: Union[str, None] = None, is_master:bool = True):
         super().__init__()
+        if cluster_name is not None:
+            self.load(cluster_name, is_master)
 
+    def install(self, cluster_name:str) -> None:
+        res = self._write()
+        path = constant.CLUSTER_DIRECTORY / cluster_name
+        if self.is_master():
+            path = path / constant.MASTER_NAME_DIR
+        else:
+            path = path / constant.CAVE_NAME_DIR
+        path = path / 'server.ini'
+        ssh.create_file(path, res)
+
+    def load(self, cluster_name: str, is_master: bool) -> None:
+        path = constant.CLUSTER_DIRECTORY / cluster_name
+        if is_master:
+            path = path / constant.MASTER_NAME_DIR
+        else:
+            path = path / constant.CAVE_NAME_DIR
+        path = path / 'server.ini'
+
+        content = ssh.get_file_content(path)
+        if content != None:
+            self._read(content)
 
     def is_master(self) -> Union[bool, None]:
         master = self.get_option(ServerKey.IS_MASTER)
-        if master == None:
+        if master is None:
             return None
         return to_bool(master)
 
@@ -519,7 +569,7 @@ class Server(ConfigurationFile):
             return True
 
         name = self.name()
-        if name == None:
+        if name is None:
             return False
         return bool(len(name))
 
