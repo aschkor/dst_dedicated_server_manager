@@ -1,12 +1,28 @@
 from typing import Union
+import time
 from . import ssh
 from . import constant
 from . import configuration_file as cf
 from . import worldgen as wg
 from . import mods as md
 from . import token as tk
-from pathlib import PurePosixPath as Path
-import time
+try:
+    from pathlib import PurePosixPath as Path
+except:
+    print('install pathlib module')
+    import os
+    try:
+        os.system('python3 -m pip install pathlib')
+    except:
+        try:
+            os.system('python -m pip install pathlib')
+        except:
+            print('Pip might not be installed, please install pip')
+            import sys
+            sys.exit()
+    from pathlib import PurePosixPath as Path
+
+
 class Server:
     def __init__(self, settings: cf.Server, world_settings: wg.WorldGen, mods: list[md.Module]):
         self.settings = settings

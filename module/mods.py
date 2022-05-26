@@ -1,11 +1,41 @@
 from typing import Union
 from .import ssh
-from .slpp import slpp
 from . import constant
 from pathlib import PurePosixPath as Path
 from lupa import LuaRuntime
 import random
 
+try:
+    from lupa import LuaRuntime
+except:
+    print('install lupa module')
+    import os
+    try:
+        os.system('python3 -m pip install lupa')
+    except:
+        try:
+            os.system('python -m pip install lupa')
+        except:
+            print('Pip might not be installed, please install pip')
+            import sys
+            sys.exit()
+    from lupa import LuaRuntime
+
+try:
+    import slpp
+except:
+    print('install slpp module')
+    import os
+    try:
+        os.system('python3 -m pip install slpp')
+    except:
+        try:
+            os.system('python -m pip install slpp')
+        except:
+            print('Pip might not be installed, please install pip')
+            import sys
+            sys.exit()
+    import slpp
 
 table_parse_function = """
 function printTable(t, f)

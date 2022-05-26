@@ -1,7 +1,35 @@
 from typing import Union
-from pathlib import PurePosixPath as Path
 from . import constant
-import paramiko
+try:
+    from pathlib import PurePosixPath as Path
+except:
+    print('install pathlib module')
+    import os
+    try:
+        os.system('python3 -m pip install pathlib')
+    except:
+        try:
+            os.system('python -m pip install pathlib')
+        except:
+            print('Pip might not be installed, please install pip')
+            import sys
+            sys.exit()
+    from pathlib import PurePosixPath as Path
+try:
+    import paramiko
+except:
+    print('install paramiko module')
+    import os
+    try:
+        os.system('python3 -m pip install paramiko')
+    except:
+        try:
+            os.system('python -m pip install paramiko')
+        except:
+            print('Pip might not be installed, please install pip')
+            import sys
+            sys.exit()
+    import paramiko
 
 
 class SshSession(object):

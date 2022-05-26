@@ -1,7 +1,21 @@
 from .import ssh
 from . import constant
 from typing import Union
-from pathlib import PurePosixPath as Path
+try:
+    from pathlib import PurePosixPath as Path
+except:
+    print('install pathlib module')
+    import os
+    try:
+        os.system('python3 -m pip install pathlib')
+    except:
+        try:
+            os.system('python -m pip install pathlib')
+        except:
+            print('Pip might not be installed, please install pip')
+            import sys
+            sys.exit()
+    from pathlib import PurePosixPath as Path
 
 class Token():
     def __init__(self, content = None, owner = None, cluster_name = None):

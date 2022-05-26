@@ -1,8 +1,22 @@
 from enum import Enum
 from typing import Union
 from . import constant
-from .slpp import slpp
 from . import ssh
+try:
+    import slpp
+except:
+    print('install slpp module')
+    import os
+    try:
+        os.system('python3 -m pip install slpp')
+    except:
+        try:
+            os.system('python -m pip install slpp')
+        except:
+            print('Pip might not be installed, please install pip')
+            import sys
+            sys.exit()
+    import slpp
 
 class EnumOption(Enum):
     def __str__(self) -> str:
