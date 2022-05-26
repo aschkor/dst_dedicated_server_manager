@@ -52,7 +52,7 @@ def int_menu(choices: list[str]) -> int:
     return int_input(dict_to_str(menu), len(choices))
 
 def rm_module()-> None:
-    modules = mods.installed()
+    modules = all_mods()
     res = int_menu(get_module_list_name(modules))
     if res == 0:
         return
@@ -61,7 +61,7 @@ def rm_module()-> None:
 
 def add_module() -> None:
     while True:
-        res = input_value('Enter module Id (Enter 0 to return)')
+        res = input_value('Enter module Id (Enter 0 to return). See https://steamcommunity.com/sharedfiles/filedetails/?id=764296557 to know how get the module identity')
         if res == '0':
             return
         mods.add(res)
@@ -88,8 +88,13 @@ def get_module_list_name(modules: list[mods.Module]) -> list[str]:
         res.append(line)
     return res
 
+def all_mods() -> list[mods.Module]:
+    print('Retrieve available modules. Please wait...')
+    return mods.installed()
+
+
 def view_module() -> None:
-    res = get_module_list_name(mods.installed())
+    res = get_module_list_name(all_mods)
     line = ''
     for l in res:
         line = line + l + '\n\n'
@@ -178,7 +183,7 @@ def add_mods() -> list[mods.Module]:
     if res == 0:
         return []
 
-    modules = mods.installed()
+    modules = all_mods()
     names = get_module_list_name(modules)
     selected_module = []
     for s in select_module(names):
